@@ -19,8 +19,6 @@ Example call: curl http://127.0.0.1:5000/catsim/similar/catid=123&n=5
 
 parser = reqparse.RequestParser()
 
-service = ""
-
 class CategorySimilarity:
 
     def __init__(self):
@@ -160,8 +158,6 @@ class CategorySimilarity:
         print "Category {}".format(category_ids)
         return []
 
-cs = CategorySimilarity()
-
 class Add(Resource):
     """
     Adds a category vector to the model
@@ -222,6 +218,7 @@ def raiseError(error):
 
 if __name__ == '__main__':
     global service
+    global cs
     # ----------- Parsing Arguments ---------------
     p = argparse.ArgumentParser()
     p.add_argument("--host", help="Host name (default: localhost)")
@@ -236,10 +233,12 @@ if __name__ == '__main__':
     port = int(args.port) if args.port else 5000
     django_host = args.django_host if args.django_host else "0.0.0.0"
     django_port = args.django_port if args.django_port else "8001"
-    service = django_host + ":" + django_port + "/catsim"
+    service = "http://" + django_host + ":" + django_port + "/category/get_category_space?"
+    print service
     api.add_resource(Similar, path + '/similar')
     api.add_resource(Add, path + '/add')
     api.add_resource(Del, path + '/del')
+    cs = CategorySimilarity()
 
     app.run(host=host, port=port)
 
