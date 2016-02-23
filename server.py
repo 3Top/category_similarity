@@ -62,7 +62,8 @@ class CategorySimilarity:
                 model.syn0 = np.vstack((model.syn0, vector))
             except ValueError as e:
                 print(e)
-                print(u"Vector length: {}".format(len(vector)))
+                print("Vector length: {}".format(len(vector)))
+                print("Space Length: {}".format(model.vector_size))
         return model
 
     def build_category_space(self):
@@ -70,7 +71,7 @@ class CategorySimilarity:
         @summary retrieve all category vectors and construct a Word2Vec vector space.
         # Compute the vector if it wasn't computed.
         """
-        category_space = Word2Vec()
+        category_space = Word2Vec(size=300)
         s = requests.Session()
         s.headers = {"content-type": "application/json", "accept": "application/json"}
         resp = s.get(service + "page=1")
@@ -111,6 +112,9 @@ class CategorySimilarity:
             return
         v = self.is_valid_vector(vector)
         if v:
+            print category_id
+            print vector
+            print space.vector_size
             space = self.add_vector_to_model(category_id, vector, space)
             self.category_space = space
             print("new category added to vector space.")
@@ -153,6 +157,7 @@ class CategorySimilarity:
         except:
             e = sys.exc_info()[0]
             print(str(e))
+        print "Category {}".format(category_ids)
         return []
 
 cs = CategorySimilarity()
@@ -181,6 +186,11 @@ class Del(Resource):
         parser.add_argument('catid', type=str, required=True, help="Category ID is mandatory")
         args = parser.parse_args()
         cs.remove_category_from_space(args['catid'])
+        # print """           +++++++++++++++++++++++++++++++++++++
+        #    +                                   +
+        #    +            YOUPI                  +
+        #    +                                   +
+        #    +++++++++++++++++++++++++++++++++++++"""
         return
 
 
@@ -195,7 +205,6 @@ class Similar(Resource):
             n = args['n']
         else:
             n = 3
-        print " n={}".format(n)
         similar = cs.most_similar_categories(catid, n)
         print "{}".format(similar)
         return similar
