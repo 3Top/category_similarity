@@ -19,7 +19,7 @@ Example call: curl http://127.0.0.1:5000/catsim/similar/catid=123&n=5
 
 parser = reqparse.RequestParser()
 
-service = "http://0.0.0.0:8001/category/get_category_space?"
+service = ""
 
 class CategorySimilarity:
 
@@ -221,16 +221,22 @@ def raiseError(error):
     return error
 
 if __name__ == '__main__':
-
+    global service
     # ----------- Parsing Arguments ---------------
     p = argparse.ArgumentParser()
     p.add_argument("--host", help="Host name (default: localhost)")
     p.add_argument("--port", help="Port (default: 5000)")
     p.add_argument("--path", help="Path (default: /catsim)")
+    p.add_argument("--django_host", help="Django host name (default: 0.0.0.0)")
+    p.add_argument("--django_port", help="Port (default: 8001)")
+    # http://0.0.0.0:8001
     args = p.parse_args()
     host = args.host if args.host else "localhost"
     path = args.path if args.path else "/catsim"
     port = int(args.port) if args.port else 5000
+    django_host = args.django_host if args.django_host else "0.0.0.0"
+    django_port = args.django_port if args.django_port else "8001"
+    service = django_host + ":" + django_port + "/catsim"
     api.add_resource(Similar, path + '/similar')
     api.add_resource(Add, path + '/add')
     api.add_resource(Del, path + '/del')
