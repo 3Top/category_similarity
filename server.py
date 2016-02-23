@@ -1,15 +1,12 @@
 
 from __future__ import unicode_literals
 import json
-import urllib2
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask
 from flask.ext.restful import Resource, Api, reqparse
-from gensim.models.word2vec import Word2Vec as w
 import argparse
 import base64
 from gensim.models.word2vec import Word2Vec, Vocab
-from gensim import matutils
 import numpy as np
 import sys
 
@@ -51,9 +48,9 @@ class CategorySimilarity:
     def add_vector_to_model(self, category_id, vector, model):
         # The category should not already be in the space
         # (rebuild the space in that case)
-        catid = '#'+ unicode(category_id)
+        catid = '#' + unicode(category_id)
         if catid in model.vocab:
-            return model
+            self.remove_category_from_space(category_id)
         w_count = len(model.vocab)
         model.vocab[catid] = Vocab(index=w_count, count=w_count+1)
         model.index2word.append(catid)
@@ -81,7 +78,7 @@ class CategorySimilarity:
         num_pages = data['num_pages']
         categories = data['categories_with_vectors']
         page = 1
-        while page < num_pages:
+        while page <= num_pages:
             for category in categories:
                 # Get the vector and add it to the space
                 if category['_vector']:
@@ -91,6 +88,7 @@ class CategorySimilarity:
                         continue
                     v = self.is_valid_vector(vector)
                     if v:
+                        # print category['id']
                         category_space = self.add_vector_to_model(category['id'], vector, category_space)
                     else:
                         print "invalid vector for category {}".format(category['id'])
@@ -130,7 +128,7 @@ class CategorySimilarity:
         try:
             voc = self.category_space.vocab['#{}'.format(category_id)]
         except KeyError:
-            print("Could not remove category {} from the space. It was not there.".format(category))
+            print("Could not remove category {} from the space. It was not there.".format(category_id))
         else:
             del self.category_space.vocab['#{}'.format(category_id)]
             self.category_space.syn0 = np.delete(self.category_space.syn0, voc.index)
@@ -141,53 +139,65 @@ class CategorySimilarity:
         """
         try:
             if type(category_ids) == list:
-                print "hello"
                 tops = self.category_space.most_similar_cosmul(positive=['#' + unicode(category_id) for category_id in category_ids], topn=n)
-                print "hello"
             else:
                 tops = self.category_space.most_similar_cosmul('#' + unicode(category_ids), topn=n)
-            print "TOPS {}".format(tops)
             return [top[0].lstrip('#') for top in tops]
         except AttributeError as e:
             print(unicode(e) + ": " + unicode(category_ids))
             return []
         except TypeError as e:
             print(str(e))
+        except KeyError as e:
+            print(str(e))
         except:
             e = sys.exc_info()[0]
             print(str(e))
-
+        return []
 
 cs = CategorySimilarity()
 
-class AddVector(Resource):
+class Add(Resource):
     """
     Adds a category vector to the model
     """
     def post(self):
-        parser.add_argument('vector', type=str, required=True, help="base64 encoding of the Numpy vector string export for the category", action='append')
-        parser.add_argument('catid', type=str, required=True, help="Category ID is mandatory", action='append')
+        parser.add_argument('vector', type=str, required=True, help="base64 encoding of the Numpy vector string export for the category")
+        parser.add_argument('catid', type=str, required=True, help="Category ID is mandatory")
         args = parser.parse_args()
+        print args
         vector = base64.b64decode(args['vector'])
         space = cs.add_category_to_space(args['catid'], vector, cs.category_space)
         if space:
             cs.category_space = space
         return
 
+
+class Del(Resource):
+    """
+    Remove a category
+    """
+    def post(self):
+        parser.add_argument('catid', type=str, required=True, help="Category ID is mandatory")
+        args = parser.parse_args()
+        cs.remove_category_from_space(args['catid'])
+        return
+
+
 class Similar(Resource):
     def get(self):
         parser = reqparse.RequestParser()
         parser.add_argument('catid', type=int, required=True, help="Category ID is mandatory", action='append')
-        parser.add_argument('n', type=int, required=False, help="Number of similar categories to return", action='append')
+        parser.add_argument('n', type=int, required=False, help="Number of similar categories to return")
         args = parser.parse_args()
         catid = args['catid']
         if args['n']:
-            n = int(args['n'])
+            n = args['n']
         else:
             n = 3
         print " n={}".format(n)
         similar = cs.most_similar_categories(catid, n)
-        print "---------- {}".format(similar)
+        print "{}".format(similar)
         return similar
 
 app = Flask(__name__)
@@ -207,13 +217,14 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument("--host", help="Host name (default: localhost)")
     p.add_argument("--port", help="Port (default: 5000)")
-    p.add_argument("--path", help="Path (default: /word2vec)")
+    p.add_argument("--path", help="Path (default: /catsim)")
     args = p.parse_args()
     host = args.host if args.host else "localhost"
     path = args.path if args.path else "/catsim"
     port = int(args.port) if args.port else 5000
-    api.add_resource(Similar, path+'/similar')
-    api.add_resource(AddVector, path+'/add_vector')
+    api.add_resource(Similar, path + '/similar')
+    api.add_resource(Add, path + '/add')
+    api.add_resource(Del, path + '/del')
 
     app.run(host=host, port=port)
 
